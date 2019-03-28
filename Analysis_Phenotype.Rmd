@@ -1,0 +1,728 @@
+---
+title: "Phenotype_Reservoirs"
+author: "Sean Perez"
+date: "3/28/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r, echo=FALSE, message=FALSE}
+#Loading useful libraries
+library("tidyverse") #Includes dplyr, stringr, ggplot2, etc.
+library("ggpubr") #Plotting box and whiskers (maybe redundant)
+library("pwr") #For power analysis
+library("lsr") #To calculate effect size
+```
+
+```{r, echo=FALSE, message=FALSE}
+#Uploading the GCMS data
+alldata <- read.csv("/Users/seanperez/Desktop/Beetle Spray Data and analysis/gcms_9_20_TIConly.csv")
+
+#Uploading Kip's metadata
+Metadata <- read.csv("/Users/seanperez/Desktop/Beetle Spray Data and analysis/MetaData_GCMS_9-20_Rep1-2-3.csv") %>% 
+  #Only using relevant columns
+  select(set_num, rep, spray.response, sex, res1, res2, rc, sc, spray.caught.in.glass.tube, notes)
+
+#Join Kip's metadata to the GCMS files (Sex, comments, etc.)
+alldata.joined <- left_join(alldata, Metadata)
+```
+
+```{r, echo=FALSE, message=FALSE}
+#Annotating chemicals by using breaks in retention times.
+chembreaks <- c(0, 5.3, #Other1
+                5.6, # Benzoquinone
+                6.2, # Other2
+                6.5, # Methyl_Benzoquinone
+                7.1, # Other3
+                7.3, # Dimethyl_Benzoquinone
+                7.6, # Other4
+                7.8, # Tert_butyl_Benzoquinone
+                8, #Other5
+                8.5, #Hydroquinone
+                9, #Methyl_Hydroquinone
+                10, #Tert_butyl_Hydroquinone
+                11.1, #Other6
+                11.2, #Hydrocarbon1
+                11.6, #Other7
+                11.75, #Hydrocarbon2
+                15) #Other9
+
+chemlabels <- c("Other1", #0-5.3
+                "Benzoquinone", #5.3-5.6,
+                "Other2", #5.6 - 6.2, 
+                "Methyl_Benzoquinone", #6.2 - 6.5
+                "Other3", #6.5 - 7.1 
+                "Dimethyl_Benzoquinone", #7.1 - 7.3 
+                "Other4", #7.3 - 7.6
+                "Tert_butyl_Benzoquinone", #7.6 - 7.8
+                "Other5", #7.8 - 8
+                "Hydroquinone", #8 - 8.5
+                "Methyl_Hydroquinone", #8.5 - 9
+                "Tert_butyl_Hydroquinone", # 9 - 10
+                "Other6", #10 - 11.1
+                "Hydrocarbon1", #11.1 - 11.2
+                "Other7", #11.2 - 11.6
+                "Hydrocarbon2", #11.6 - 11.75
+                "Other8") #11.8 - 15
+alldata$Chemical <- cut(alldata$RT, breaks = chembreaks, labels = chemlabels)
+alldata.joined$Chemical <- cut(alldata$RT, breaks = chembreaks, labels = chemlabels)
+
+#The following bins have NO RT hits:
+#1. Other2
+#2. Other3
+#3. Other4
+#4. Other5
+#5. Other6
+
+#Unidentified RTs are at:
+#1. Other1 
+#2. Other7
+#3. Other8
+
+# Every compound that is labeled with a chemical looks good RT-wise. 
+```
+
+#Questions
+1. What chemicals are found in the secretory cells, reservoirs, and blasts?
+2. What is the primary composition of blasts? 
+3. Does the quantity of aromatics in the reservoirs change as beetles continue to blast? 
+
+#Hypotheses
+1. If complete biosynthesis occurs in the secretory cells, we would expect to find hydrocarbons and aromatic compounds in the secretory cells. In the reservoir we would expect to find hydrocarbons, the unoxidized hydroquinones, and if oxidation is occurring either naturally or through exposure to other chemicals, benzoquinones. In the blast we would expect to find hydrocarbons and benzoquinones, if all the hydroquinone is to be fully converted to its oxidized counterparts in the reaction chamber.
+
+2. *Brachinus elongatulus* are expected to produce methyl-1,4-benzoquinone and 1,4-benzoquinone in nearly equaivalent amounts, as well as a small amount of dimethyl-benzoquinone if their blasts are similar to *B. sublaevis* and *B. quadripennis* (Eisner et al. 1977). No published literature has looked at the species *Brachinus elongatulus*.
+
+3. As *Brachinus elongatulus* continue to blast, we expect a decrease in the quantity of aromatic compounds in the reservoirs as they use up their stores.
+
+
+
+##Results
+#1. What chemicals are present in the secretory cells, reservoirs, and blasts?
+
+**a) Secretory Cells**
+Querying distinct chemical compounds in the secretory cells.
+```{r}
+alldata %>% filter(sample == "sc") %>% distinct(Chemical)
+```
+
+Only the following are found in any of the SC samples: 
+
+1. Hydrocarbon 1 - alkane  
+2. Hydrocarbon 2 - alkene 
+
+This does not support the hypothesis that aromatic compounds are being produced in appreciable quantities in the secretory cells. This does support the hypothesis that the hydrocarbons are produced in the secretory cell in appreciable quantities. 
+
+*In the future, it would be useful to have a negative control with other beetle tissues. This would let us know if this hydrocarbon is unique to the pygidial gland system, or if it is present throughout the beetle in detectable quantities.*
+
+**b) Reservoirs**
+Querying distinct chemical compounds in the reservoirs.
+```{r}
+alldata %>% filter(grepl("res", sample)) %>% distinct(Chemical)
+```
+
+The following are found in any of the reservoir samples:
+
+1. Benzoquinone 
+2. Methyl-benzoquinone
+3. Dimethyl-benzoquinone
+4. Hydroquinone
+5. Methyl-hydroquinone
+6. Hydrocarbon 1
+7. Hydrocarbon 2
+
+This supports the hypothesis that hydrocarbons and the unoxidized hydroquinones are present in the reservoir. It cannot be determined if the presence of the benzoquinones is due to those compounds truly being present in the reservoir, or due to oxidation during dissection, and introduction to the solvent/internal standard.
+
+**c) Blasts**
+
+```{r}
+alldata %>% filter(sample == "B1") %>% distinct(Chemical)
+```
+
+Only the following are found in any of the blasts:
+
+1. Benzoquinone
+2. Methyl-Benzoquinone
+3. Dimethyl Benzoquinone
+4. Hydrocarbon 1 - alkane
+5. Hydrocarbon 2 - alkene
+
+Our hypothesis is supported, the blasts only contain the oxidized benzoquinones. No hydroquinones were detected. This indicates that conversion of the reduced hydroquinone stored in the reservoir, to the oxidized benzoquinone in the spray is highly efficient.
+
+
+
+```{r, echo=FALSE, message=FALSE}
+#Spreading data for just aromatic compounds in the reservoirs for comparison:
+
+#Make a string with which to filter out only aromatic compounds.
+Aromatic_ONLY_string <- c("Benzoquinone", "Methyl_Benzoquinone", "Dimethyl_Benzoquinone",  "Tert_butyl_Benzoquinone", "Hydroquinone", "Methyl_Hydroquinone", "Tert_butyl_Hydroquinone")
+
+#Spread data for only reservoir samples with aromatic chemicals.
+Spread.all.data <- alldata %>%
+  filter(grepl("res", sample)) %>%
+  filter(Chemical %in% Aromatic_ONLY_string) %>%
+  select(ID, Area, Chemical) %>%
+  spread(Chemical, Area)
+
+#Making all NAs 0s for plotting purposes.
+Spread.all.data[, 2:8][is.na(Spread.all.data[,2:8])] <- 0
+```
+
+```{r, echo=FALSE, message=FALSE}
+#Dividing every aromatic compound of interest by the internal standard, tert-butyl-benzoquinone.
+#We initially believed simply adding the reduced and oxidized peak areas would solve the issue of the IS getting reduced, but this does not work. 
+#The intensity reading is not equivalent across different chemical compounds, so the intensity is not equivalent between oxidized and reduced forms (confirmed by Miao).
+
+Spread.data.IS_values <- Spread.all.data %>%
+  mutate(Benzoquinone = 
+           Benzoquinone/(Tert_butyl_Benzoquinone)) %>%
+  mutate(Methyl_Benzoquinone = Methyl_Benzoquinone/Tert_butyl_Benzoquinone) %>%
+  mutate(Dimethyl_Benzoquinone = Dimethyl_Benzoquinone/Tert_butyl_Benzoquinone) %>%
+    mutate(Hydroquinone = Hydroquinone/Tert_butyl_Benzoquinone) %>%
+  mutate(Methyl_Hydroquinone = Methyl_Hydroquinone/Tert_butyl_Benzoquinone) %>%
+  #Removing internal standard as it no longer serves any purpose for analysis
+  select(-Tert_butyl_Benzoquinone, -Tert_butyl_Hydroquinone)
+```
+
+```{r, echo=FALSE, message=FALSE}
+#Gathering the data to make it easier for visualization in ggplot.
+
+Gather.IS.Values <- Spread.data.IS_values %>%
+  gather(Chemical, Area_Div_Stand, -ID)
+```
+
+```{r, echo=FALSE, message=FALSE}
+#Appending the set data again
+Gather.IS.sets <- Gather.IS.Values %>%
+  mutate(set = str_extract(ID, "^[a-zA-Z0-9]{4}") )
+
+Gather.IS.sets$set <- ordered(Gather.IS.sets$set,
+                              levels = c("set1", "set2", "set3"))
+```
+
+#2. Is there a significant difference between our treatment groups in the reservoir samples?
+ * We only use reservoirs because blasts were only taken for one set, and secretory cells only contain hydrocarbons.
+
+Getting basic summary statistics of the aromatic compounds for all sets in the reservoir.
+```{r, echo=FALSE, message=FALSE}
+Aromatic_set_means <- group_by(Gather.IS.sets, Chemical, set) %>%
+   summarise(
+    count = n(),
+    mean = mean(Area_Div_Stand, na.rm = TRUE),
+    sd = sd(Area_Div_Stand, na.rm = TRUE)
+  ) 
+
+Aromatic_set_means
+```
+
+Plotting the mean values for every set of aromatic compounds
+
+
+```{r, echo=FALSE, message=FALSE}
+ggplot(Aromatic_set_means) +
+  aes(x = Chemical, y = mean, col = set) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Mean Quantity of Aromatic Compounds in Reservoirs Among Sets") +
+  ylab("Mean Area Intensity of Compound/Area Intensity of Internal Standard")
+```
+
+
+#2a. Making boxplots for all aromatic compounds for visualization. 
+
+##Plotting all sets of each chemical individually. 
+
+```{r, echo=FALSE, message=FALSE}
+ggboxplot(Gather.IS.sets %>%
+            filter(Chemical == "Benzoquinone") %>%
+            select(ID, Area_Div_Stand, set),
+          x = "ID", y = "Area_Div_Stand", 
+          color = "set", 
+          palette = c("#00AFBB", "#E7B800", "#FC4E07"),
+          order = c("set1", "set2", "set3"),
+          ylab = "Peak Area", xlab = "Treatment Set",
+          title = "Benzoquinone in the Reservoir Between Sets")
+
+ggboxplot(Gather.IS.sets %>%
+            filter(Chemical == "Methyl_Benzoquinone") %>%
+            select(ID, Area_Div_Stand, set),
+          x = "ID", y = "Area_Div_Stand", 
+          color = "set", palette = c("#00AFBB", "#E7B800", "#FC4E07"),
+          order = c("set1", "set2", "set3"),
+          ylab = "Peak Area", xlab = "Treatment Set",
+          title = "Methyl-Benzoquinone in the Reservoir Between Sets")
+
+ggboxplot(Gather.IS.sets %>%
+            filter(Chemical == "Hydroquinone") %>%
+            select(ID, Area_Div_Stand, set),
+          x = "ID", y = "Area_Div_Stand", 
+          color = "set", palette = c("#00AFBB", "#E7B800", "#FC4E07"),
+          order = c("set1", "set2", "set3"),
+          ylab = "Peak Area", xlab = "Treatment Set",
+          title = "Hydroquinone in the Reservoir Between Sets")
+
+ggboxplot(Gather.IS.sets %>%
+            filter(Chemical == "Methyl_Hydroquinone") %>%
+            select(ID, Area_Div_Stand, set),
+          x = "ID", y = "Area_Div_Stand", 
+          color = "set", palette = c("#00AFBB", "#E7B800", "#FC4E07"),
+          order = c("set1", "set2", "set3"),
+          ylab = "Peak Area", xlab = "Treatment Set",
+          title = "Methyl-Hydroquinone in the Reservoir Between Sets")
+```
+
+##Box plot with all chemicals and sets together.
+
+
+```{r}
+ggplot(data = Gather.IS.sets) +
+  aes(x = Chemical, y = Area_Div_Stand, col = set) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Quantity of Aromatic Compounds in Reservoirs Among Sets") +
+  ylab("Area /Area Internal Standard")
+```
+
+
+##Plotting all data points within the boxplot
+
+
+```{r}
+ggplot(data = Gather.IS.sets) +
+  aes(x = Chemical, y = Area_Div_Stand, col = set) +
+  geom_boxplot() +
+  geom_point(position = position_jitterdodge()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Quantity of Aromatic Compounds in Reservoirs Among Sets") +
+  ylab("Area /Area Internal Standard")
+```
+
+
+
+
+
+#2b. Testing for statistically significant differences between all sets for quantity of aromatic compounds using a one way ANOVA:
+
+##1. Benzoquinone
+```{r, echo=FALSE, message=FALSE}
+set_Benzoquinone <- Gather.IS.sets %>% filter(Chemical == "Benzoquinone") 
+  
+ANOVA_res_Benzoquinone <- aov(Area_Div_Stand ~ set, set_Benzoquinone)
+summary(ANOVA_res_Benzoquinone)
+```
+There was a significant difference in the amount of Benzoquinone between all sets  
+$p = 0.0478$
+
+##2. Methyl-Benzoquinone
+```{r, echo=FALSE, message=FALSE}
+set_Methyl_Benzoquinone <- Gather.IS.sets %>% filter(Chemical == "Methyl_Benzoquinone") 
+  
+ANOVA_res_Methyl_Benzoquinone <- aov(Area_Div_Stand ~ set, set_Methyl_Benzoquinone)
+summary(ANOVA_res_Methyl_Benzoquinone)
+```
+There was a significant difference in the amount of Methyl-Benzoquinone between all sets 
+$p = 0.0175$
+
+##3. Hydroquinone 
+```{r, echo=FALSE, message=FALSE}
+set_Hydroquinone <- Gather.IS.sets %>% filter(Chemical == "Hydroquinone") 
+  
+ANOVA_res_Hydroquinone <- aov(Area_Div_Stand ~ set, set_Hydroquinone)
+summary(ANOVA_res_Hydroquinone)
+```
+There was no significant difference in the amount of Hydroquinone between all sets.
+$p = 0.0588$
+
+##4. Methyl-Hydroquinone
+```{r, echo=FALSE, message=FALSE}
+set_Methyl_Hydroquinone <- Gather.IS.sets %>% filter(Chemical == "Methyl_Hydroquinone") 
+  
+ANOVA_res_Methyl_Hydroquinone <- aov(Area_Div_Stand ~ set, set_Methyl_Hydroquinone)
+summary(ANOVA_res_Methyl_Hydroquinone)
+```
+There was no significant difference in the amount of Methyl-Hydroquinone between all sets.
+$p = 0.194$
+
+#2c. Pairwise ANOVA  for all aromatic compounds. 
+##1. Benzoquinone
+```{r}
+TukeyHSD(ANOVA_res_Benzoquinone)
+```
+No significant pair-wise differences of Benzoquinone between sets.
+
+##2. Methyl-Benzoquinone
+```{r}
+TukeyHSD(ANOVA_res_Methyl_Benzoquinone)
+```
+Only set1 and set3 have a statistically significant pairwise difference of Methyl-Benzoquinone.
+$p = 0.0192086$
+
+##3. Hydroquinone
+```{r}
+TukeyHSD(ANOVA_res_Hydroquinone)
+```
+No significant pair-wise differences of Hydroquinones between sets.
+
+
+##4. Methyl-Hydroquinone
+```{r}
+TukeyHSD(ANOVA_res_Methyl_Hydroquinone)
+```
+No significant pair-wise differences of Methyl-Hydroquinones between sets.
+
+#Power Analysis
+
+What is the statistical power, rejecting the null when it is false, of our tests given the:
+1. Sample size $n =5$
+2. Effect Size
+3. Significance level $\alpha = 0.05$
+
+We would need an effect size of $f = 0.9129504$
+
+So what is our effect size for:
+1. Methyl-Benzoquinone
+
+```{r}
+anova(ANOVA_res_Methyl_Benzoquinone)
+
+#Effect size = SSregression / SStotal
+
+#Sum Sq set / (Sum Sq set + Sum Sq Residual)
+5.2291/(5.2291+11.1228)
+
+#Or try try lsr:etaSquared
+etaSquared(ANOVA_res_Methyl_Benzoquinone)
+```
+*The effect size is 0.31 for methyl-benzoquinone.*
+
+What is the power of our one-way ANOVA for methyl-benzoquinone?
+
+```{r}
+pwr.anova.test(k = 3,
+               n = 5,
+               sig.level = 0.05,
+               f = 0.3197868)
+```
+
+Our statistical power is very small, 15%. This means we would not detect significant differences, even if they are legitimate, 85% of the time. 
+
+a. What effect size do we need to have a statistical power of 80%?
+b. How many samples do we need to have 80% power?
+
+```{r}
+pwr.anova.test(k = 3,
+               n = 5,
+               sig.level = 0.05,
+               power = 0.8)
+
+pwr.anova.test(k = 3,
+               f = 0.3197868,
+               sig.level = 0.05,
+               power = 0.8)
+```
+
+a. We would need an effect size of $f = 0.91$ in order for our current experimental design:
+($n = 5$, $k = 3$) to have 80% power. 
+
+b. We would need $n = 32$ replicates within each group to have a power of 80%. 
+
+
+
+
+
+
+#Converting area intensity to concentration (mM) using the calibrations for each of the four major aromatic compounds.
+
+Tranforming the data step by step to quantify each sample's concentration:
+
+1. Divide area of sample by area of internal standard. (Complete)
+
+2. Create a calibration curve for all our compounds of interest. This creates a model with which a concentration can be obtained from the intensity. This has been done for:
+
+Benzoquinone $y= 7.78x - 0.517$
+
+Methyl-Benzoquinone $y = 10.4x - 6.7$
+
+Hydroquinone $y = 10.7x - 16.8$
+
+Methyl-Hydroquinone $y = 16.2x - 31.3$
+
+3. Use this model to calculate the concentration for all compounds that have had a calibration curve done.
+
+* Benzoquinone
+* Methyl-Benzoquinone
+* Hydroquinone
+* Methyl-Hydroquinone
+
+4. For these four you simply convert the area ratio into concentration. 
+*Important to note* This is only the concentration of the sample that was "captured" within the vial. 
+```{r}
+#Creating functions for each of the calibration curve using the linear regression equations given by Miao
+
+#Benzoquinone 
+Cal_Benz_Func <- function(x) {
+  result <- c() #empty vector
+  
+  for (i in 1:length(x)) #For loop to apply over a vector (entire column of values)
+  if (x[i] <= 0) { 
+    result[i] <- 0 #If IS ratio is 0, make concentration also 0
+  }
+  else {
+  result[i] <- 7.78*x[i] - 0.517 #Applying the linear regression equation to get conc. in Mm
+  }
+  return(result)
+}
+
+#Methyl-Benzoquinone 
+Cal_Methyl_Benz_Func <- function(x) {
+  result <- c() 
+  
+  for (i in 1:length(x)) 
+  if (x[i] == 0) {
+    result[i] <- 0
+}
+  else {
+    result[i] <- 10.4*x[i] - 6.7
+    }
+    return(result)
+}
+
+#Hydroquinone function
+Cal_Hydro_Func <- function(x) {
+  result <- c()
+  for (i in 1:length(x)) 
+    if(x[i] == 0) {
+      result[i] <- 0 
+    }
+  else {
+    result[i] <- 10.7*x[i] - 16.8
+  }
+        return(result)
+}
+
+#Methyl-Hydroquinone function
+Cal_Methyl_Hydro_Func <- function(x) {
+  result <-c()
+  for (i in 1:length(x))
+    if(x[i] == 0) {
+      result[i] <- 0
+    }
+  else {
+    result[i] <- 16.2*x[i] - 31.3
+  }
+  return(result)
+}
+  
+
+
+Conc.converted.data <- Spread.data.IS_values %>%
+  mutate(Benzoquinone.Conc.Mm = Cal_Benz_Func(Benzoquinone)) %>%
+  mutate(Methyl_Benzoquinone.Conc.Mm = Cal_Methyl_Benz_Func(Methyl_Benzoquinone)) %>%
+  mutate(Hydroquinone.Conc.Mm = Cal_Hydro_Func(Hydroquinone)) %>%
+  mutate(Methyl_Hydroquinone.Conc.Mm = Cal_Methyl_Hydro_Func(Methyl_Hydroquinone)) %>%
+  select(ID,
+         Benzoquinone.Conc.Mm, 
+         Methyl_Benzoquinone.Conc.Mm,
+         Hydroquinone.Conc.Mm,
+         Methyl_Hydroquinone.Conc.Mm)  
+
+#Making a long dataframe for easier plotting with ggplot
+Gather.conc.converted <- Conc.converted.data %>%
+  gather(Chemical, Concentration_Mm, -ID) %>%
+  mutate(set = str_extract(ID, "^[a-zA-Z0-9]{4}") )
+```
+
+
+Plotting the concentrations for each set.
+
+
+```{r}
+ggplot(Gather.conc.converted) +
+  aes(x = Chemical, y = Concentration_Mm, col = set) +
+  geom_boxplot() +
+  geom_point(position = position_jitterdodge()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Concentration Aromatic Compounds in Reservoirs Among Sets") +
+  ylab("Concentration Using Calibrated Curve Linear Equation")
+```
+
+
+
+
+The raw data for the concentration converted Chemicals. *Within the code if the initial value of area intensity was 0, the concentration was also set to 0*
+```{r}
+Gather.conc.converted
+```
+
+
+*Calibration curves do not function properly. This is because our actual concentrations are much lower than those in the calibration curve model. This makes samples with lower concentrations appear negative using this linear model.*
+
+#Major Issues with this dataset and experiment:
+
+##1. The internal standard was reduced
+* We cannot simply add the intensities of reduced and oxidized internal standards. They intensity is different for different compounds and NOT comparable. 
+
+-May not make the data publishable. 
+
+* Fix? Make a solution with the same concentration of tert-butyl-hydroquinone and tert-butyl-benzoquinone and compare the peak area. 
+
+##2. We cannot calculate concentration
+* The linear equation line doesn't work because the compound/standard ratio are much smaller than what was analyzed in the calibrations. 
+* We would need to do more runs at much lower concentrations to be able to get a linear equation that includes the lower spectrum of our concentrations.
+
+##3. Our data are highly variable
+
+
+-------------------------------
+
+#Vetting major aromatic compounds and finding where they are present:
+1. Benzoquinone
+2. Methyl-Benzoquinone
+3. Dimethyl-Benzoquinone
+4. Hydroquinone
+5. Methylhydroquinone
+
+Making sure these RTs are all correct with the way we binned these compounds:
+#1. Benzoquinone
+```{r}
+Benzoquinone <- alldata.joined %>% 
+  filter(Chemical == "Benzoquinone")
+```
+*All benzoquinones look legitimate according to RT.*
+* Benzoquinones only present in 3 reservoir samples (2 from set 1, and 1 from set 2). **All of these are female**
+* Benzoquinones appear in all blasts. 
+```{r}
+min(Benzoquinone$Start)
+max(Benzoquinone$End)
+mean(Benzoquinone$RT)
+```
+
+RT Max Range = 5.399 - 5.592
+RT Avge = 5.434
+
+
+#2. Methyl-Benzoquinone
+```{r}
+Methyl_Benzoquinone <- alldata.joined %>% 
+  filter(Chemical == "Methyl_Benzoquinone")
+```
+*All methyl-benzoquinones look legitimate according to RT*
+* Methyl-Benzoquinones appear in all (8/8) set 1 reservoirs. 
+* Methyl-Benzoquinones appear in 4/8 set 2 reservoirs.
+* Methyl-Benzoquinones appear in 3/8 set 3 reservoirs
+
+* Methyl-Benzoquinones appear in all blasts. 
+
+```{r}
+min(Methyl_Benzoquinone$Start)
+max(Methyl_Benzoquinone$End)
+mean(Methyl_Benzoquinone$RT)
+```
+
+RT Max range = 6.288 - 6.569
+RT Avg = 6.324
+
+
+#3. Dimethyl-Benzoquinone
+```{r}
+Dimethyl_Benzoquinone <- alldata.joined %>%
+  filter(Chemical == "Dimethyl_Benzoquinone")
+```
+*All dimethyl-benzoquinones look legitimate according to RT*
+* Dimethyl benzoquinones appears in all (8/8) set 1 reservoirs.
+* Dimethyl benzoquinones appears in 2/8 set 2 reservoirs.
+* Dimethyl benzoquinones appears in
+
+```{r}
+min(Dimethyl_Benzoquinone$Start)
+max(Dimethyl_Benzoquinone$End)
+mean(Dimethyl_Benzoquinone$RT)
+```
+RT Max Range = 7.113-7.267
+RT avg = 7.160
+
+#4. Hydroquinone
+```{r}
+Hydroquinone <- alldata.joined %>%
+  filter(Chemical == "Hydroquinone")
+```
+*All hydroquinone peaks look legitimate according to RT*
+* Hydroquinones only in set 1
+* Hydroquinones in 4/8 reservoirs in set 1
+
+```{r}
+min(Hydroquinone$Start)
+max(Hydroquinone$End)
+mean(Hydroquinone$RT)
+```
+
+RT Max range = 8.052 - 8.545
+RT avg = 8.3185
+
+*There is a small overlap in the RT of Methyl-Hydroquinone and Hydroquinone.*
+
+#5. Methyl-Hydroquinone
+```{r}
+Methyl_Hydroquinone <- alldata.joined %>%
+  filter(Chemical == "Methyl_Hydroquinone")
+```
+
+```{r}
+min(Methyl_Hydroquinone$Start)
+max(Methyl_Hydroquinone$End)
+mean(Methyl_Hydroquinone$RT)
+```
+RT Max Range = 8.302 - 10.004
+RT Avg = 8.712
+
+This compounds has teh greatest range in retention times, it may be worth looking at the mass spectra at different points on the peak in openchrom.
+
+*There is a small overlap in the RT of Methyl-Hydroquinone and Hydroquinone. Will this effect quantification where they do overlap?*
+
+#6. Tert-butyl-Benzoquinone:
+```{r}
+Tert_Butyl_Benzoquione <- alldata.joined %>%
+  filter(Chemical == "Tert_butyl_Benzoquinone")
+```
+
+```{r}
+min(Tert_Butyl_Benzoquione$Start)
+max(Tert_Butyl_Benzoquione$End)
+mean(Tert_Butyl_Benzoquione$RT)
+```
+RT Max Range = 7.63 - 7.773
+RT Avg = 7.664
+
+
+#Study Design
+A total of 16 ($n=16$) *Brachinus elongatulus* were used for this experiment. Three treatment groups each with 4 biological replicates were analyzed for differences in chemical phenotype. 
+
+1. The first treatment group was sampled with replete reservoirs, never having sprayed.
+2. The second treatment group was coerced to spray once.
+3. The third treament group was coerced to spray twice, and sprays/blasts being sampled. 
+
+#Methodological questions
+1. Is the amount of standard (t-butyl-benzoquinone) similar across samples?
+*yes*
+
+Plotting the area of the standard in all samples to check for consistency
+```{r, echo=FALSE, message=FALSE}
+ggplot(Tert_Butyl_Benzoquione) +
+  aes(x = ID, y = Area, col = sample) +
+  geom_point() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    ggtitle("The Chromatogram Intensity of the Internal Standard Across Different Tissue Types") +
+  scale_y_continuous(breaks = seq(0, 4, by = 0.2))
+```
+
+The intensity of the standard (tert-butyl-Benzoquinone) is relatively consistent across all samples. With a 1st Quartile at 535,863 the Median at 559,899, and the 3rd Quartile at 633,632.
+
+The three outliers in standard intensity are:
+1. set1-RepB-1-res (lower) 243,675
+2. set1-RepC-1-res (higher) 1,139,288 - Kip added 25uL Hexane?
+3. set1-RepD-2-res (higher) 1,402,544 - Kip added 15uL Hexane?
