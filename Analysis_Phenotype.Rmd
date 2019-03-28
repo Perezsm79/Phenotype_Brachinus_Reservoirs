@@ -204,7 +204,9 @@ Spread.data.keys <- Spread.data.IS_values %>%
 
 ```{r}
 #Making the dataframe a data.table
-
+blah <- Spread.data.keys %>%
+  group_by(keyz) %>%
+  summarise_each(funs(sum))
 ```
 
 
