@@ -27,7 +27,7 @@ library("lsr") #To calculate effect size
 #Uploading Kip's metadata
 #Metadata <- read.csv("/Users/seanperez/Desktop/Beetle Spray Data and analysis/MetaData_GCMS_9-20_Rep1-2-3.csv") %>% 
   #Only using relevant columns
-  select(set_num, rep, spray.response, sex, res1, res2, rc, sc, spray.caught.in.glass.tube, notes)
+  #select(set_num, rep, spray.response, sex, res1, res2, rc, sc, spray.caught.in.glass.tube, notes)
 
 #Join Kip's metadata to the GCMS files (Sex, comments, etc.)
 alldata.joined <- left_join(alldata, Metadata)
@@ -193,6 +193,20 @@ Spread.data.IS_values <- Spread.all.data %>%
 Overall goal: Combine rows of different reservoirs from the same beetle.
 
 To do this we will use the spread.data.IS.values.
+
+```{r}
+#Make a common key ID for each beetle
+Spread.data.keys <- Spread.data.IS_values %>%
+  mutate(keyz = str_extract(ID, "^set[0-9]{1}[-]rep[A-Z]{1}")) %>%
+  select(-ID)
+```
+
+
+```{r}
+#Making the dataframe a data.table
+
+```
+
 
 
 
