@@ -22,10 +22,10 @@ library("lsr") #To calculate effect size
 
 ```{r, echo=FALSE, message=FALSE}
 #Uploading the GCMS data
-alldata <- read.csv("/Users/seanperez/Desktop/Beetle Spray Data and analysis/gcms_9_20_TIConly.csv")
+#alldata <- read.csv("/Users/seanperez/Desktop/Beetle Spray Data and analysis/gcms_9_20_TIConly.csv")
 
 #Uploading Kip's metadata
-Metadata <- read.csv("/Users/seanperez/Desktop/Beetle Spray Data and analysis/MetaData_GCMS_9-20_Rep1-2-3.csv") %>% 
+#Metadata <- read.csv("/Users/seanperez/Desktop/Beetle Spray Data and analysis/MetaData_GCMS_9-20_Rep1-2-3.csv") %>% 
   #Only using relevant columns
   select(set_num, rep, spray.response, sex, res1, res2, rc, sc, spray.caught.in.glass.tube, notes)
 
@@ -188,6 +188,24 @@ Spread.data.IS_values <- Spread.all.data %>%
   #Removing internal standard as it no longer serves any purpose for analysis
   select(-Tert_butyl_Benzoquinone, -Tert_butyl_Hydroquinone)
 ```
+
+#Joe our work starts here:
+Overall goal: Combine rows of different reservoirs from the same beetle.
+
+To do this we will use the spread.data.IS.values.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ```{r, echo=FALSE, message=FALSE}
 #Gathering the data to make it easier for visualization in ggplot.
