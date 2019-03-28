@@ -197,50 +197,37 @@ To do this we will use the spread.data.IS.values.
 ```{r}
 #Make a common key ID for each beetle
 Spread.data.keys <- Spread.data.IS_values %>%
-  mutate(keyz = str_extract(ID, "^set[0-9]{1}[-]rep[A-Z]{1}")) %>%
+  mutate(ID_beetle = str_extract(ID, "^set[0-9]{1}[-]rep[A-Z]{1}")) %>%
   select(-ID)
 ```
 
-
 ```{r}
-#Making the dataframe a data.table
-blah <- Spread.data.keys %>%
-  group_by(keyz) %>%
+#Sum values of reservoirs
+Spread.Combined.Res <- Spread.data.keys %>%
+  group_by(ID_beetle) %>%
   summarise_each(funs(sum))
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r, echo=FALSE, message=FALSE}
-#Gathering the data to make it easier for visualization in ggplot.
-
-Gather.IS.Values <- Spread.data.IS_values %>%
-  gather(Chemical, Area_Div_Stand, -ID)
-```
-
-```{r, echo=FALSE, message=FALSE}
-#Appending the set data again
-Gather.IS.sets <- Gather.IS.Values %>%
-  mutate(set = str_extract(ID, "^[a-zA-Z0-9]{4}") )
+```{r}
+#Gather values for easier plotting and make a new column to define set #
+Gather.IS.sets <- Spread.Combined.Res %>%
+  gather(Chemical, Area_Div_Stand, -ID_beetle) %>%
+  mutate(set = str_extract(ID_beetle, "set[1-9]{1}"))
 
 Gather.IS.sets$set <- ordered(Gather.IS.sets$set,
                               levels = c("set1", "set2", "set3"))
 ```
 
-#2. Is there a significant difference between our treatment groups in the reservoir samples?
- * We only use reservoirs because blasts were only taken for one set, and secretory cells only contain hydrocarbons.
+Next goal: 
+1. Redo statistical analyses
+* One way ANOVA
+
+2. Make boxplots
+* Add stars for significant differences between groups.
+
+3. Calculate power and effect size considering smaller sample size.
+
+4. Calculate absolute difference between reservoirs. 
 
 Getting basic summary statistics of the aromatic compounds for all sets in the reservoir.
 ```{r, echo=FALSE, message=FALSE}
@@ -253,6 +240,132 @@ Aromatic_set_means <- group_by(Gather.IS.sets, Chemical, set) %>%
 
 Aromatic_set_means
 ```
+
+Testing for statistically significant differences between all sets for quantity of aromatic compounds using a one way ANOVA:
+
+##1. Benzoquinone
+```{r, echo=FALSE, message=FALSE}
+set_Benzoquinone <- Gather.IS.sets %>% filter(Chemical == "Benzoquinone") 
+  
+ANOVA_res_Benzoquinone <- aov(Area_Div_Stand ~ set, set_Benzoquinone)
+summary(ANOVA_res_Benzoquinone)
+```
+There was not a significant difference in the amount of Benzoquinone between all sets  
+$p = 0.105$
+
+##2. Methyl-Benzoquinone
+```{r, echo=FALSE, message=FALSE}
+set_Methyl_Benzoquinone <- Gather.IS.sets %>% filter(Chemical == "Methyl_Benzoquinone") 
+  
+ANOVA_res_Methyl_Benzoquinone <- aov(Area_Div_Stand ~ set, set_Methyl_Benzoquinone)
+summary(ANOVA_res_Methyl_Benzoquinone)
+```
+There was not a significant difference in the amount of Methyl-Benzoquinone between all sets 
+$p = 0.0994$
+
+##3. Hydroquinone 
+```{r, echo=FALSE, message=FALSE}
+set_Hydroquinone <- Gather.IS.sets %>% filter(Chemical == "Hydroquinone") 
+  
+ANOVA_res_Hydroquinone <- aov(Area_Div_Stand ~ set, set_Hydroquinone)
+summary(ANOVA_res_Hydroquinone)
+```
+There was no significant difference in the amount of Hydroquinone between all sets.
+$p = 0.155$
+
+##4. Methyl-Hydroquinone
+```{r, echo=FALSE, message=FALSE}
+set_Methyl_Hydroquinone <- Gather.IS.sets %>% filter(Chemical == "Methyl_Hydroquinone") 
+  
+ANOVA_res_Methyl_Hydroquinone <- aov(Area_Div_Stand ~ set, set_Methyl_Hydroquinone)
+summary(ANOVA_res_Methyl_Hydroquinone)
+```
+There was no significant difference in the amount of Methyl-Hydroquinone between all sets.
+$p = 0.345$
+
+#2c. Pairwise ANOVA  for all aromatic compounds. 
+##1. Benzoquinone
+```{r}
+TukeyHSD(ANOVA_res_Benzoquinone)
+```
+No significant pair-wise differences of Benzoquinone between sets.
+
+##2. Methyl-Benzoquinone
+```{r}
+TukeyHSD(ANOVA_res_Methyl_Benzoquinone)
+```
+Only set1 and set3 have a statistically significant pairwise difference of Methyl-Benzoquinone.
+$p = 0.0192086$
+
+##3. Hydroquinone
+```{r}
+TukeyHSD(ANOVA_res_Hydroquinone)
+```
+No significant pair-wise differences of Hydroquinones between sets.
+
+
+##4. Methyl-Hydroquinone
+```{r}
+TukeyHSD(ANOVA_res_Methyl_Hydroquinone)
+```
+No significant pair-wise differences of Methyl-Hydroquinones between sets.
+
+#Plotting the differences between sets
+
+```{r, echo=FALSE, message=FALSE}
+ggplot(Aromatic_set_means) +
+  aes(x = Chemical, y = mean, col = set) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Mean Quantity of Aromatic Compounds in Reservoirs Among Sets") +
+  ylab("Mean Area Intensity of Compound/Area Intensity of Internal Standard")
+```
+
+##Box plot with all chemicals and sets together.
+
+
+```{r}
+ggplot(data = Gather.IS.sets) +
+  aes(x = Chemical, y = Area_Div_Stand, col = set) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Quantity of Aromatic Compounds in Reservoirs Among Sets") +
+  ylab("Area /Area Internal Standard")
+```
+
+
+##Plotting all data points within the boxplot
+
+
+```{r}
+ggplot(data = Gather.IS.sets) +
+  aes(x = Chemical, y = Area_Div_Stand, col = set) +
+  geom_boxplot() +
+  geom_point(position = position_jitterdodge()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Quantity of Aromatic Compounds in Reservoirs Among Sets") +
+  ylab("Area /Area Internal Standard")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#2. Is there a significant difference between our treatment groups in the reservoir samples?
+ * We only use reservoirs because blasts were only taken for one set, and secretory cells only contain hydrocarbons.
+
 
 Plotting the mean values for every set of aromatic compounds
 
